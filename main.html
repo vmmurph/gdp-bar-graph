@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>GDP Bar Graph</title>
+        <script src="https://d3js.org/d3.v5.min.js"></script>
+        <svg id='canvas' width=1400 height=600></svg>
+
+        <style>
+            .axis {
+                opacity: .6;
+            }
+
+            .title-text {
+                opacity: .6;
+                font-size: 36px;
+            }
+
+            .regular-text {
+                opacity: .6;
+                font-size: 30px;
+            }
+        </style>
+    </head>
+    <body>
+        <script>
+            // colors
+            const background = '#EADBC4'
+            const negative = '#990000'
+            const neutral = 'white'
+            const positive = '#11772B'
+
+            // global to store data once it loads (useful for debugging in console)
+            let dataset
+
+            // set up margin, height, width
+            const margin = {
+                top: 10,
+                right: 10,
+                bottom: 30,
+                left: 50
+            }
+            const svg = d3.select('#canvas')
+            const width = svg.attr('width') - margin.left - margin.right
+            const height = svg.attr('height') - margin.top - margin.bottom
+            
+            const g = svg.append('g')
+                .attr('transform', `translate(${margin.left}, ${margin.top})`)
+
+            svg.style('background-color', background)
+
+            // formats the data array into named attributes and adds a delta
+            const formatData = (d, i, arr) => {
+                const date = new Date(d[0])
+                const gdp = d[1]
+                let delta
+                if (i === 0) {
+                    delta = 1
+                } else {
+                    delta = d[1] / arr[i-1][1]
+                }
+                return { date, gdp, delta }
+            }
+            
+            // fetches data, parses to json, formats into neat objects, then calls drawGraph
+            fetch('https://raw.githubusercontent.com/freeCodeCamp/ProjectReferenceData/master/GDP-data.json')
+                .then(res => res.json())
+                .then(res => res.data.map(formatData))
+                .then(data => { drawGraph(data); dataset = data })
+
+            const drawGraph = (data) => {
+                const widthPerDatum = width / data.length
+                const spacer = 0
+                const barWidth = widthPerDatum - spacer
+                const yMax = d3.max(data, d => d.gdp)
+                const xMin = d3.min(data, d => d.date)
+                // creates a new date for this so that the reference doesn't get updated, then adds
+                // 3 months so that the last bar doesn't leak off to the right of the scale
+                const xMax = new Date(d3.max(data, d => d.date))
+                xMax.setMonth(xMax.getMonth() + 3)
+
+                // set up a custom scale made up of two linear scales so that it can go from
+                // red to white for negative gdp delta, then white to green for positive
+                const deltaMin = d3.min(data, d => d.delta)
+                const deltaMax = d3.max(data, d => d.delta)
+                const delta1 = d3.scaleLinear().domain([deltaMin, 1]).range([negative, neutral])
+                const delta2 = d3.scaleLinear().domain([1, deltaMax]).range([neutral, positive])
+                const deltaScale = delta =>  delta < 1 ? delta1(delta) : delta2(delta)
+
+                const xScale = d3.scaleTime().domain([xMin, xMax]).range([0, width])
+                const yScale = d3.scaleLinear().domain([0, yMax]).range([height, 0])
+
+                // add some labels
+                g.append('text').text('USA Gross Domestic Product (Billions)')
+                    .attr('x', 50)
+                    .attr('y', 150)
+                    .classed('title-text', true)
+
+                g.append('text').text('')
+                    .attr('x', 50)
+                    .attr('y', 200)
+                    .attr('id', 'detail')
+                    .classed('regular-text', true)
+
+                // function to create and show detail for a bar being hovered
+                const showDetail = d => {
+                    let quarter = '?'
+                    switch (d.date.getMonth()) {
+                        case 2: quarter = 'Q1'; break
+                        case 5: quarter = 'Q2'; break
+                        case 8: quarter = 'Q3'; break
+                        case 11: quarter = 'Q4'; break
+                    }
+                    const p = Math.round((d.delta - 1) * 10000) / 100
+                    g.select('#detail')
+                        .text(`${d.date.getFullYear()} ${quarter}: $${d.gdp} billion (${p}%)`)
+                        .attr('fill', d.delta < 1 ? negative : positive)
+                }
+
+                // creates the rectangles for each data point
+                g.selectAll('rect')
+                    .data(data)
+                    .enter()
+                    .append('rect')
+                        .attr('x', d => xScale(d.date))
+                        .attr('y', d => yScale(d.gdp))
+                        .attr('width', barWidth)
+                        .attr('height', d => yScale(0) - yScale(d.gdp))
+                        .attr('fill', d => deltaScale(d.delta))
+                        .on('mouseover', function (d, i) {
+                            d3.select(this).attr('opacity', .5)
+                            showDetail(d)
+                        })
+                        .on('mouseout', function (d, i) {
+                            d3.select(this).attr('opacity', 1)
+                            d3.select('#detail').text('')
+                        })
+                        .on('click', d => console.log(d))
+
+                // add axis to graph
+                const yAxis = d3.axisLeft().scale(yScale)
+                const xAxis = d3.axisBottom().scale(xScale)
+                g.append('g').call(yAxis).classed('axis', true)
+                g.append('g').call(xAxis)
+                    .attr('transform', `translate(0, ${height})`)
+                    .classed('axis', true)
+            }
+        </script>
+    </body>
+</html>
