@@ -62,7 +62,7 @@
             }
             
             // fetches data, parses to json, formats into neat objects, then calls drawGraph
-            fetch('https://raw.githubusercontent.com/freeCodeCamp/ProjectReferenceData/master/GDP-data.json')
+            fetch('https://vmmurph.github.io/gdp-bar-graph/GDP-data.json')
                 .then(res => res.json())
                 .then(res => res.data.map(formatData))
                 .then(data => { drawGraph(data); dataset = data })
